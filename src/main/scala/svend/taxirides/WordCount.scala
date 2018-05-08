@@ -19,10 +19,10 @@ import org.apache.kafka.streams.kstream.Printed
   *
   *   kafka-console-producer --broker-list localhost:9092  --key-serializer org.apache.kafka.common.serialization.StringSerialization --topic inputText
   *   kafka-console-producer --broker-list localhost:9092  --topic rawSentences
-  *
   * which you can check by just tailing that topic:
   *
   *   kafka-console-consumer --bootstrap-server localhost:9092 --topic rawSentences --from-beginning
+  *
   *
   *
   * One the programme below runs (e.g. through "sbt run"), you can simply inspect its output with
@@ -34,7 +34,7 @@ import org.apache.kafka.streams.kstream.Printed
   *
   * */
 
-object WordCount extends App {
+object WordCount  {
 
   val config: Properties = {
     val p = new Properties()
