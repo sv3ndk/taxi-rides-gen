@@ -1,6 +1,7 @@
 package svend.taxirides
 
 import com.lightbend.kafka.scala.streams.DefaultSerdes._
+import com.lightbend.kafka.scala.streams.{KTableS, StreamsBuilderS}
 import org.apache.kafka.common.utils.Time
 import org.apache.kafka.streams.kstream.Transformer
 import org.apache.kafka.streams.processor.{ProcessorContext, PunctuationType}
@@ -12,19 +13,28 @@ import scala.collection.JavaConverters._
 object Stories {
 
 
-  def buildTrigger[ID, M](storyName: String) = {
+  /**
+    * Builds a story trigger for a population of type A.
+    *
+    * This returns a KStreamsS of Agent ids, when they are triggered.
+    * */
+  def buildTrigger[A](builder: StreamsBuilderS, storyName: String, population: KTableS[String, A]) = {
 
     val timerStoreName = s"${storyName}Timers"
     val timerStoreSupplier = Stores.inMemoryKeyValueStore(timerStoreName)
 
-    val timerStoreBuilder = new KeyValueStoreBuilder[Clients.ClientId, Long](
+    val timerStoreBuilder = new KeyValueStoreBuilder[String, Long](
       timerStoreSupplier,
       stringSerde,
       longSerde,
       Time.SYSTEM
     )
 
-    (timerStoreName, timerStoreBuilder, () => new ClientsTrigger[ID, M](timerStoreName))
+    builder.addStateStore(timerStoreBuilder)
+
+    population
+      .toStream
+      .transform(() => new ClientsTrigger[A](timerStoreName), timerStoreName)
 
   }
 
@@ -32,23 +42,23 @@ object Stories {
     * Trigger of a Story: responsible for maintaining a state with a counter for each population member
     * + decrementing it regularly and triggering story execution when needed
     *
-    * ID: type of the id of the population member, typically a string
-    * M: type of the population member itself (typically some case class)
+    * A: type of the population agent itself (typically some case class)
     * */
-  class ClientsTrigger[ID, M](timerStoreName: String) extends Transformer[ID, M, (ID, ID)] {
+  class ClientsTrigger[A](timerStoreName: String) extends Transformer[String, A, (String, String)] {
 
-    var timers: KeyValueStore[ID, Long] = _
+    var timers: KeyValueStore[String, Long] = _
     var context: ProcessorContext = _
+    var timerGen = Generators.randPosInt(25)
 
     override def init(processorContext: ProcessorContext): Unit = {
       processorContext.schedule(100, PunctuationType.WALL_CLOCK_TIME, (timestamp: Long) => timeStep())
-      timers = processorContext.getStateStore(timerStoreName).asInstanceOf[KeyValueStore[ID, Long]]
+      timers = processorContext.getStateStore(timerStoreName).asInstanceOf[KeyValueStore[String, Long]]
       context = processorContext
     }
 
-    override def transform(clientId: ID, value: M): (ID, ID) = {
+    override def transform(agentId: String, agent: A): (String, String) = {
       // initialize the timer for this story for each population member
-      timers.putIfAbsent(clientId, resetTimer)
+      timers.putIfAbsent(agentId, genTimerValue)
       null
     }
 
@@ -64,7 +74,7 @@ object Stories {
           val updatedTimer =
             if (timer.value == 0) {
               context.forward(timer.key, timer.key)
-              resetTimer
+              genTimerValue
             } else {
               timer.value -1
             }
@@ -77,7 +87,11 @@ object Stories {
     /**
       * Generates a new value for this timer
       * */
-    def resetTimer: Int = 10
+    def genTimerValue: Int = {
+      val timerValue = timerGen.head
+      timerGen = timerGen.tail
+      timerValue
+    }
 
 
     // ------------------
@@ -89,8 +103,6 @@ object Stories {
     override def punctuate(timestamp: Long) = null
 
   }
-
-
 
 
 }

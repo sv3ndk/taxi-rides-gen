@@ -7,10 +7,10 @@ import org.apache.kafka.streams.kstream.Printed
 
 object TaxiRides extends App {
 
-  Clients.populateMembers()
+  ClientsPopulation.populateMembers(20)
 
   val builder = new StreamsBuilderS()
-  val clientsPopulation = Clients.population(builder)
+  val clientsPopulation = ClientsPopulation.population(builder)
 
   val taxiRidesLogs = TaxiRidesScenario.addTaxiRidesStory(builder, clientsPopulation)
 
@@ -24,24 +24,19 @@ object TaxiRides extends App {
 
 object TaxiRidesScenario {
 
-
   /**
     * Builds the taxi ride story, in which Clients hail taxis in their current zone and get a ride
     * to one of their favourite zones.
     * */
-  def addTaxiRidesStory(builder: StreamsBuilderS, clientsPopulation: KTableS[Clients.ClientId, Clients.Client]) = {
+  def addTaxiRidesStory(builder: StreamsBuilderS, clientsPopulation: KTableS[String, ClientsPopulation.Client]) = {
 
 
-    val (storyTimerStoreName, storyTimerStore, storyTriggerSupplier) =
-      Stories.buildTrigger[Clients.ClientId, Clients.Client]("taxiRides")
+    val triggeredIdStream = Stories
+      .buildTrigger(builder, "taxiRides", clientsPopulation)
 
-    builder.addStateStore(storyTimerStore)
 
-    clientsPopulation
-      .toStream
-      .transform(storyTriggerSupplier, storyTimerStoreName)
+    triggeredIdStream
 
   }
-
 
 }

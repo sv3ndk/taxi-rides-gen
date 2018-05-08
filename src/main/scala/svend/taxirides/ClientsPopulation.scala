@@ -28,31 +28,35 @@ import org.apache.kafka.streams.state.Stores
   * */
 
 
-object Clients {
+object ClientsPopulation {
 
-  type ClientId = String
   type Client = String
-
 
   /**
     * populates data in Kafka for the client's population (in a compacted topic)
     * */
-  def populateMembers(): Unit = {
+  def populateMembers(n: Int): Unit = {
 
     val props = Config.kafkaProducerProps
     props.put("key.serializer", "org.apache.kafka.common.serialization.StringSerializer")
     props.put("value.serializer", "org.apache.kafka.common.serialization.StringSerializer")
 
-    val clientProducer = new KafkaProducer[ClientId, Client](props)
+    val clientProducer = new KafkaProducer[String, Client](props)
 
-    Generators.sequencialGen("cl").take(20).foreach { client =>
-      clientProducer.send( new ProducerRecord[ClientId, Client](Config.topics.clientPopulation, client, client) )
-    }
+    val idGenerator = Generators.sequencialGen("cl")
+
+    idGenerator
+      .take(n)
+      .foreach { client =>
+        clientProducer.send( new ProducerRecord[String, Client](Config.topics.clientPopulation, client, client) )
+      }
 
     clientProducer.close()
   }
 
   def population(builder: StreamsBuilderS) = {
-    builder.table[ClientId, Client](Config.topics.clientPopulation)
+    builder.table[String, Client](Config.topics.clientPopulation)
   }
+
+
 }
