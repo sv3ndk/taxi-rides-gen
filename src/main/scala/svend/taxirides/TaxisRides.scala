@@ -28,12 +28,10 @@ object TaxiRidesScenario {
     * Builds the taxi ride story, in which Clients hail taxis in their current zone and get a ride
     * to one of their favourite zones.
     * */
-  def addTaxiRidesStory(builder: StreamsBuilderS, clientsPopulation: KTableS[String, ClientsPopulation.Client]) = {
-
+  def addTaxiRidesStory(builder: StreamsBuilderS, clientsPopulation: KTableS[String, Client]) = {
 
     val triggeredIdStream = Stories
       .buildTrigger(builder, "taxiRides", clientsPopulation)
-
 
     triggeredIdStream
 

@@ -7,12 +7,15 @@ import org.apache.kafka.streams.StreamsConfig
 object Config {
 
   object topics {
-    val clientPopulation = "clients-population"
+    val clientPopulation = "clients-population-2"
   }
 
   def kafkaProducerProps= {
     val props = new Properties()
     props.put("bootstrap.servers", "localhost:9092")
+
+    // by convention, we serialize all keys as String
+    props.put("key.serializer", "org.apache.kafka.common.serialization.StringSerializer")
 
     // super brittle config: this is a simulator, we care about speed and don't care if we drop stuff on the floor
     // from time to time
