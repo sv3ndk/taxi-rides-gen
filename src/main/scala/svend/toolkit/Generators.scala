@@ -1,6 +1,4 @@
-package svend.taxirides
-
-import scala.util.Random
+package svend.toolkit
 
 object Generators {
 
@@ -14,15 +12,6 @@ object Generators {
     rest(0)
   }
 
-
-  /**
-    * Creates a generator of positive integer
-    * */
-  def randPosInt(maxValue: Int): Gen[Int] =  {
-    val r = new Random()
-    def rest: Stream[Int] = r.nextInt(maxValue) #:: rest
-    rest
-  }
 
 
 }

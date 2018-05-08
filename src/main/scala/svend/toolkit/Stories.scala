@@ -1,4 +1,4 @@
-package svend.taxirides
+package svend.toolkit
 
 import com.lightbend.kafka.scala.streams.DefaultSerdes._
 import com.lightbend.kafka.scala.streams.{KTableS, StreamsBuilderS}
@@ -9,6 +9,7 @@ import org.apache.kafka.streams.state.internals.KeyValueStoreBuilder
 import org.apache.kafka.streams.state.{KeyValueStore, Stores}
 
 import scala.collection.JavaConverters._
+import scala.util.Random
 
 object Stories {
 
@@ -16,7 +17,9 @@ object Stories {
   /**
     * Builds a story trigger for a population of type A.
     *
-    * This returns a KStreamsS of Agent ids, when they are triggered.
+    * This returns a KStreamsS of Agent ids events, when they are triggered
+    *   => the rest of the story can then be written as a transformation of those IDs
+    *
     * */
   def buildTrigger[A](builder: StreamsBuilderS, storyName: String, population: KTableS[String, A]) = {
 
@@ -48,7 +51,7 @@ object Stories {
 
     var timers: KeyValueStore[String, Long] = _
     var context: ProcessorContext = _
-    var timerGen = Generators.randPosInt(25)
+    val random = new Random()
 
     override def init(processorContext: ProcessorContext): Unit = {
       processorContext.schedule(100, PunctuationType.WALL_CLOCK_TIME, (timestamp: Long) => timeStep())
@@ -87,22 +90,15 @@ object Stories {
     /**
       * Generates a new value for this timer
       * */
-    def genTimerValue: Int = {
-      val timerValue = timerGen.head
-      timerGen = timerGen.tail
-      timerValue
-    }
-
+    def genTimerValue: Int = random.nextInt(25)
 
     // ------------------
     // unused methods
-
 
     override def close(): Unit = {}
 
     override def punctuate(timestamp: Long) = null
 
   }
-
 
 }

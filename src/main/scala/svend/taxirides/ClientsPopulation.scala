@@ -7,26 +7,17 @@ import com.lightbend.kafka.scala.streams.ImplicitConversions._
 import com.lightbend.kafka.scala.streams._
 import com.sksamuel.avro4s._
 import org.apache.kafka.clients.producer.{KafkaProducer, ProducerRecord}
+import svend.taxirides.Client.ClientSerializer
+import svend.toolkit.Generators
 
 
 /*
   * This is responsible for creating the Client's Population, as a KTable.
-  * --config delete.retention.ms=1000
-  *
-  * First create a topic. We use a super short retention period
-
-  kafka-topics                            \
-  --create                              \
-  --zookeeper localhost:2181            \
-  --partitions 1                        \
-  --replication-factor 1                \
-  --config cleanup.policy=compact   \
-  --topic taxirides-population-clients-2
-
   * */
 
 /**
-  * Client are the agent that are part of a population
+  * Client are the agent that are part of a population. THey only contain an id
+  * for now, we'll add more attributes later,...
   * */
 case class Client(id: String)
 
@@ -66,7 +57,7 @@ object ClientsPopulation {
   def populateMembers(n: Int): Unit = {
 
     val props = Config.kafkaProducerProps
-    props.put("value.serializer", "svend.taxirides.Client$ClientSerializer")
+    props.put("value.serializer", classOf[ClientSerializer].getName)
 
     val clientProducer = new KafkaProducer[String, Client](props)
 
