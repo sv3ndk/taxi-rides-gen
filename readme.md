@@ -4,6 +4,7 @@ This is a quick proof of concept of a data generator based on Kafka Streams. Mos
 
 
 In order to run, first create the necessary Kafka topics:
+
 ```
   kafka-topics                            \
   --create                              \

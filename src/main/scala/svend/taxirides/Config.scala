@@ -32,7 +32,7 @@ object Config {
     p.put(StreamsConfig.BOOTSTRAP_SERVERS_CONFIG, "localhost:9092")
 
     // help deduplicating existing values in a KTable, while keeping some throughput
-    p.put(StreamsConfig.COMMIT_INTERVAL_MS_CONFIG, 100)
+    p.put(StreamsConfig.COMMIT_INTERVAL_MS_CONFIG, "100")
     p
   }
 

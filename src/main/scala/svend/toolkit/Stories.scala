@@ -13,15 +13,13 @@ import scala.util.Random
 
 object Stories {
 
-
-  /**
+  /*
     * Builds a story trigger for a population of type A.
     *
-    * This returns a KStreamsS of Agent ids events, when they are triggered
+    * This returns a KStreamsS of Population Member ids events, when they are triggered
     *   => the rest of the story can then be written as a transformation of those IDs
-    *
-    * */
-  def buildTrigger[A](builder: StreamsBuilderS, storyName: String, population: KTableS[String, A]) = {
+    */
+  def buildTrigger[M](builder: StreamsBuilderS, storyName: String, population: KTableS[String, M]) = {
 
     val timerStoreName = s"${storyName}Timers"
     val timerStoreSupplier = Stores.inMemoryKeyValueStore(timerStoreName)
@@ -37,7 +35,7 @@ object Stories {
 
     population
       .toStream
-      .transform(() => new ClientsTrigger[A](timerStoreName), timerStoreName)
+      .transform(() => new ClientsTrigger[M](timerStoreName), timerStoreName)
 
   }
 
@@ -45,9 +43,9 @@ object Stories {
     * Trigger of a Story: responsible for maintaining a state with a counter for each population member
     * + decrementing it regularly and triggering story execution when needed
     *
-    * A: type of the population agent itself (typically some case class)
+    * M: type of the population member itself (typically some case class)
     * */
-  class ClientsTrigger[A](timerStoreName: String) extends Transformer[String, A, (String, String)] {
+  class ClientsTrigger[M](timerStoreName: String) extends Transformer[String, M, (String, String)] {
 
     var timers: KeyValueStore[String, Long] = _
     var context: ProcessorContext = _
@@ -59,9 +57,9 @@ object Stories {
       context = processorContext
     }
 
-    override def transform(agentId: String, agent: A): (String, String) = {
+    override def transform(memberId: String, member: M): (String, String) = {
       // initialize the timer for this story for each population member
-      timers.putIfAbsent(agentId, genTimerValue)
+      timers.putIfAbsent(memberId, genTimerValue)
       null
     }
 
