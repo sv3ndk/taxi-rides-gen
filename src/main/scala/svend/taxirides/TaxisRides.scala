@@ -16,7 +16,7 @@ object TaxiRides extends App {
 
   val builder = new StreamsBuilderS
   val clientsPopulation = ClientsPopulation.population(builder)
-  val friendsRelationship = Relationship.generateRelations(clientsPopulation, nClients)
+  val friendsRelationship = Relationship.generateRelations(builder, clientsPopulation, nClients)
 
   friendsRelationship.toStream.print(Printed.toSysOut[String, Related])
 
@@ -24,8 +24,12 @@ object TaxiRides extends App {
 
   taxiRidesLogs.print(Printed.toSysOut[String, String])
 
-  val streams = new KafkaStreams(builder.build, Config.kafkaStreamsProps)
-  streams.start()
+  val app = new KafkaStreams(builder.build, Config.kafkaStreamsProps)
+
+  // resets the state: for a data-generator, this is necessary since we have no input data: we want to
+  // forget any past state between execution and start creating new one
+  app.cleanUp()
+  app.start()
 
 }
 

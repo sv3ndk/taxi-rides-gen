@@ -28,7 +28,7 @@ object Config {
 
   val kafkaStreamsProps: Properties = {
     val p = new Properties()
-    p.put(StreamsConfig.APPLICATION_ID_CONFIG, "wordcount-application" + Calendar.getInstance.getTimeInMillis)
+    p.put(StreamsConfig.APPLICATION_ID_CONFIG, "wordcount-application")
     p.put(StreamsConfig.BOOTSTRAP_SERVERS_CONFIG, "localhost:9092")
 
     // help deduplicating existing values in a KTable, while keeping some throughput

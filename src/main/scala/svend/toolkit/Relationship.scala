@@ -4,7 +4,7 @@ import java.io.{ByteArrayInputStream, ByteArrayOutputStream}
 
 import com.lightbend.kafka.scala.streams.DefaultSerdes._
 import com.lightbend.kafka.scala.streams.ImplicitConversions._
-import com.lightbend.kafka.scala.streams.{Deserializer, KTableS, ScalaSerde, Serializer}
+import com.lightbend.kafka.scala.streams._
 import com.sksamuel.avro4s.{AvroInputStream, AvroOutputStream}
 
 import scala.util.Random
@@ -67,25 +67,39 @@ object Relationship {
   /**
     * Populates random relationships among the members of that population
     * */
-  def generateRelations[A](population: KTableS[String, A], nClients: Int): KTableS[String, Related] = {
+  def generateRelations[A]( builder: StreamsBuilderS, population: KTableS[String, A], nClients: Int): KTableS[String, Related] = {
 
-    // let's say we aim for about 5 friends per people on averate (minus collisions)
-    val nGroups = nClients / 5
+    // let's say we aim for about 2*4 friends per people on average (minus collisions)
+    val nGroups = nClients / 3
+    val iterations = 3
     val random = new Random
 
-    population
+    val friendsTopic = "taxirides-internal-friendsTopic-5"
+
+    (1 to iterations).foreach { _ =>
+      population
         // assign each person to a random group
-        .mapValues( kv => random.nextInt(nGroups))
+        .mapValues(kv => random.nextInt(nGroups))
 
         // from each group, builds the set of all related member in it
-        .groupBy{ case (id, groupid) => (groupid, Related(id)) }
-        .reduce(_ + _, _ nop _) // the nop is an abuse here, though I never change the "group" of people anyhow..
+        .groupBy { case (id, groupid) => (groupid, Related(id)) }
+        .reduce(
+          _ + _,
+
+          // I think the remove is called after each iteration, since it considers the element got assigned to another group...
+          (v1: Related, v2: Related) => v2
+        )
 
         // for each person in the group, mark all the other people as their friends
         .toStream
-        .flatMap{ case (group, friends) =>
+        .flatMap { case (group, friends) =>
           friends.ids.map { id => id -> (friends - id) }
         }
+        .to(friendsTopic)
+    }
+
+      builder
+        .stream[String, Related](friendsTopic)
         .groupByKey
         .reduce(_ + _)
 
