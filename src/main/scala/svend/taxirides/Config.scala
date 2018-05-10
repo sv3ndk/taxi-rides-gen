@@ -8,7 +8,8 @@ import org.apache.kafka.streams.StreamsConfig
 object Config {
 
   object topics {
-    val clientPopulation = "clients-population-2"
+    val clientPopulation = "clients-population"
+    val zonePopulation = "zone-population"
   }
 
   def kafkaProducerProps= {

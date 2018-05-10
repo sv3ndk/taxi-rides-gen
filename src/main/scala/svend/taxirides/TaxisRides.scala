@@ -3,7 +3,11 @@ package svend.taxirides
 import com.lightbend.kafka.scala.streams.{KTableS, StreamsBuilderS}
 import org.apache.kafka.streams.KafkaStreams
 import org.apache.kafka.streams.kstream.Printed
-import svend.toolkit.{Related, Relationship, Stories}
+import svend.taxirides.Client.ClientSerializer
+import svend.toolkit.{Population, Related, Relationship, Stories}
+import com.lightbend.kafka.scala.streams.DefaultSerdes._
+import com.lightbend.kafka.scala.streams.ImplicitConversions._
+import svend.taxirides.Zone.ZoneSerializer
 
 
 /**
@@ -12,12 +16,18 @@ import svend.toolkit.{Related, Relationship, Stories}
 object TaxiRides extends App {
 
   val nClients = 50
-  ClientsPopulation.populateMembers(nClients)
+  val nZones = 10
 
   val builder = new StreamsBuilderS
-  val clientsPopulation = ClientsPopulation.population(builder)
 
+  val clientsPopulation = Population.populateMembers[Client](builder, nClients, Client.clientGen,
+    classOf[ClientSerializer], Config.topics.clientPopulation)
   clientsPopulation.toStream.print(Printed.toSysOut[String, Client])
+
+  val zonePopulation = Population.populateMembers[Zone](builder, nZones, Zone.zoneGen,
+    classOf[ZoneSerializer], Config.topics.zonePopulation)
+  zonePopulation.toStream.print(Printed.toSysOut[String, Zone])
+
 
   val friendsRelationship = Relationship.generateBidirectionalRelations(builder,
     clientsPopulation, nClients/ 3, 2)
