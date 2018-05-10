@@ -58,52 +58,38 @@ object Related {
     }
   }
 
-
 }
 
 
 object Relationship {
 
   /**
-    * Populates random relationships among the members of that population
+    *
+    * Populates random relationships among the members of that population.
+    * For every relation from a to b, there will be a relation from b to a
+    *
     * */
-  def generateRelations[A]( builder: StreamsBuilderS, population: KTableS[String, A], nClients: Int): KTableS[String, Related] = {
+  def generateBidirectionalRelations[A](builder: StreamsBuilderS, population: KTableS[String, A],
+                                        nGroups: Int, ngroupsPerMember: Int): KTableS[String, Related] = {
 
-    // let's say we aim for about 2*4 friends per people on average (minus collisions)
-    val nGroups = nClients / 3
-
-    val iterations = 3
     val random = new Random
 
-    val friendsTopic = "taxirides-internal-friendsTopic-5"
+    population
+      .toStream
+      // assign each person to several random group
+      .flatMap { case (memberId, _) => (1 to ngroupsPerMember).map( _ => random.nextInt(nGroups) -> Related(memberId) ) }
 
-    (1 to iterations).foreach { _ =>
-      population
-        // assign each person to a random group
-        .mapValues(kv => random.nextInt(nGroups))
+      // from each group, builds the set of all members in it
+      .groupByKey.reduce( _ + _)
 
-        // from each group, builds the set of all related member in it
-        .groupBy { case (id, groupid) => (groupid, Related(id)) }
-        .reduce(
-          _ + _,
-
-          // I think the remove is called after each iteration, since it considers the element got assigned to another group...
-          (v1: Related, v2: Related) => v2
-        )
-
-        // for each person in the group, mark all the other people as their friends
-        .toStream
-        .flatMap { case (group, friends) =>
-          friends.ids.map { id => id -> (friends - id) }
-        }
-        .to(friendsTopic)
-    }
-
-      builder
-        .stream[String, Related](friendsTopic)
-        .groupByKey
-        .reduce(_ + _)
+      // for each person in the group, mark all the other people as their friends
+      .toStream
+      .flatMap { case (groupId, friends) =>
+        friends.ids.map { id => id -> (friends - id) }
+      }
+      .groupByKey.reduce(_ + _)
 
   }
+
 
 }

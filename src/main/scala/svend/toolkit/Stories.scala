@@ -35,7 +35,7 @@ object Stories {
 
     population
       .toStream
-      .transform(() => new ClientsTrigger[M](timerStoreName), timerStoreName)
+      .transform(() => new StoryTrigger[M](timerStoreName), timerStoreName)
 
   }
 
@@ -45,7 +45,7 @@ object Stories {
     *
     * M: type of the population member itself (typically some case class)
     * */
-  class ClientsTrigger[M](timerStoreName: String) extends Transformer[String, M, (String, String)] {
+  class StoryTrigger[M](timerStoreName: String) extends Transformer[String, M, (String, String)] {
 
     var timers: KeyValueStore[String, Long] = _
     var context: ProcessorContext = _

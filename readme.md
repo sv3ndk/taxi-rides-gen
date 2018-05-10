@@ -14,14 +14,6 @@ In order to run, first create the necessary Kafka topics:
   --config cleanup.policy=compact   \
   --topic taxirides-population-clients-2
 
-kafka-topics                            \
-  --create                              \
-  --zookeeper localhost:2181            \
-  --partitions 1                        \
-  --replication-factor 1                \
-  --topic taxirides-internal-friendsTopic-5
-
-
 ```
 
 Then simply launch `run` from the sbt console.

@@ -33,7 +33,7 @@ object Generators {
     val firstName = choose(givenNames)
     val lastName = choose(lastNames)
 
-    val r = Random.nextInt(a9)
+    val r = Random.nextInt(9)
     val suffix =
       if (r == 0) "ham"
       else if (r == 1) "son"

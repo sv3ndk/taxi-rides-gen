@@ -19,7 +19,9 @@ object TaxiRides extends App {
 
   clientsPopulation.toStream.print(Printed.toSysOut[String, Client])
 
-  val friendsRelationship = Relationship.generateRelations(builder, clientsPopulation, nClients)
+  val friendsRelationship = Relationship.generateBidirectionalRelations(builder,
+    clientsPopulation, nClients/ 3, 2)
+
   friendsRelationship.toStream.print(Printed.toSysOut[String, Related])
 
   val taxiRidesLogs = TaxiRidesScenario.addTaxiRidesStory(builder, clientsPopulation)
