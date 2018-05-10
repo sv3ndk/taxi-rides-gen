@@ -71,6 +71,7 @@ object Relationship {
 
     // let's say we aim for about 2*4 friends per people on average (minus collisions)
     val nGroups = nClients / 3
+
     val iterations = 3
     val random = new Random
 

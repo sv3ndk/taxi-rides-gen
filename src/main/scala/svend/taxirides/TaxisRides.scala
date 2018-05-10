@@ -16,12 +16,13 @@ object TaxiRides extends App {
 
   val builder = new StreamsBuilderS
   val clientsPopulation = ClientsPopulation.population(builder)
-  val friendsRelationship = Relationship.generateRelations(builder, clientsPopulation, nClients)
 
+  clientsPopulation.toStream.print(Printed.toSysOut[String, Client])
+
+  val friendsRelationship = Relationship.generateRelations(builder, clientsPopulation, nClients)
   friendsRelationship.toStream.print(Printed.toSysOut[String, Related])
 
   val taxiRidesLogs = TaxiRidesScenario.addTaxiRidesStory(builder, clientsPopulation)
-
   taxiRidesLogs.print(Printed.toSysOut[String, String])
 
   val app = new KafkaStreams(builder.build, Config.kafkaStreamsProps)

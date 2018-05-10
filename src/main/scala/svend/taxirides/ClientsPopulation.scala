@@ -19,9 +19,11 @@ import svend.toolkit.Generators
   * Client are the agent that are part of a population. THey only contain an id
   * for now, we'll add more attributes later,...
   * */
-case class Client(id: String)
+case class Client(id: String, name: String)
 
 object Client {
+
+  def random(id: String) = new Client(id, Generators.englishNameGen())
 
   implicit object ClientSerdes extends ScalaSerde[Client] {
     override def deserializer() = new ClientDeserializer
@@ -66,7 +68,7 @@ object ClientsPopulation {
     idGenerator
       .take(n)
       .foreach { clientId =>
-        val client = Client(clientId)
+        val client = Client.random(clientId)
         clientProducer.send( new ProducerRecord(Config.topics.clientPopulation, clientId, client) )
       }
 
