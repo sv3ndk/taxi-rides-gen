@@ -1,13 +1,13 @@
 package svend.taxirides
 
+import com.lightbend.kafka.scala.streams.DefaultSerdes._
+import com.lightbend.kafka.scala.streams.ImplicitConversions._
 import com.lightbend.kafka.scala.streams.{KTableS, StreamsBuilderS}
 import org.apache.kafka.streams.KafkaStreams
 import org.apache.kafka.streams.kstream.Printed
 import svend.taxirides.Client.ClientSerializer
-import svend.toolkit.{Population, Related, Relationship, Stories}
-import com.lightbend.kafka.scala.streams.DefaultSerdes._
-import com.lightbend.kafka.scala.streams.ImplicitConversions._
 import svend.taxirides.Zone.ZoneSerializer
+import svend.toolkit.{Population, Related, Relationship, Stories}
 
 
 /**
@@ -16,26 +16,34 @@ import svend.taxirides.Zone.ZoneSerializer
 object TaxiRides extends App {
 
   val nClients = 50
-  val nZones = 10
+  val nZones = 24
 
   val builder = new StreamsBuilderS
 
+  // taxis clients, will trigger the taxi rides scenario
   val clientsPopulation = Population.populateMembers[Client](builder, nClients, Client.clientGen,
     classOf[ClientSerializer], Config.topics.clientPopulation)
   clientsPopulation.toStream.print(Printed.toSysOut[String, Client])
 
+  // zone population, representing geographical zones where clients are taxis are located
   val zonePopulation = Population.populateMembers[Zone](builder, nZones, Zone.zoneGen,
     classOf[ZoneSerializer], Config.topics.zonePopulation)
   zonePopulation.toStream.print(Printed.toSysOut[String, Zone])
 
+  // client's favourite locations: when a taxi ride is generated, each client will go to one of their
+  // favourite locations
+  val favouriteLocations = Relationship.generateDirectionalRelations(builder,
+    clientsPopulation, zonePopulation, nZones/ 2, 2)
 
-  val friendsRelationship = Relationship.generateBidirectionalRelations(builder,
-    clientsPopulation, nClients/ 3, 2)
+//  val friendsRelationship = Relationship.generateBidirectionalRelations(builder,
+//    clientsPopulation, nClients/ 3, 2)
 
-  friendsRelationship.toStream.print(Printed.toSysOut[String, Related])
+  favouriteLocations.toStream.print(Printed.toSysOut[String, Related])
+
+//  friendsRelationship.toStream.print(Printed.toSysOut[String, Related])
 
   val taxiRidesLogs = TaxiRidesScenario.addTaxiRidesStory(builder, clientsPopulation)
-  taxiRidesLogs.print(Printed.toSysOut[String, String])
+//  taxiRidesLogs.print(Printed.toSysOut[String, String])
 
   val app = new KafkaStreams(builder.build, Config.kafkaStreamsProps)
 
@@ -71,7 +79,3 @@ object TaxiRidesScenario {
   }
 
 }
-
-
-
-

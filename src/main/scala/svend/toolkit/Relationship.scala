@@ -6,6 +6,7 @@ import com.lightbend.kafka.scala.streams.DefaultSerdes._
 import com.lightbend.kafka.scala.streams.ImplicitConversions._
 import com.lightbend.kafka.scala.streams._
 import com.sksamuel.avro4s.{AvroInputStream, AvroOutputStream}
+import org.apache.kafka.streams.kstream.Printed
 
 import scala.util.Random
 
@@ -15,7 +16,7 @@ import scala.util.Random
   * In a KTable, the key would be the id of a population memeber, and the Related would be the set
   * of ids that are related to it.
   *
-  * */
+  **/
 case class Related(ids: Set[String]) {
 
   val random = new Random
@@ -37,6 +38,7 @@ object Related {
 
   implicit object FriendsSerdes extends ScalaSerde[Related] {
     override def deserializer() = new FriendsDeserializer
+
     override def serializer() = new FriendsSerializer
   }
 
@@ -68,25 +70,54 @@ object Relationship {
     * Populates random relationships among the members of that population.
     * For every relation from a to b, there will be a relation from b to a
     *
-    * */
+    **/
   def generateBidirectionalRelations[A](builder: StreamsBuilderS, population: KTableS[String, A],
                                         nGroups: Int, ngroupsPerMember: Int): KTableS[String, Related] = {
 
+    val groupedMembers = groupedRelations(population, nGroups, ngroupsPerMember)
+
+    // for each member in each group, create a relationship from that member to all other in the same group
+    // => this makes the relationship bi-directional
+    groupedMembers.toStream
+      .flatMap { case (groupId, friends) => friends.ids.map { id => id -> (friends - id) } }
+      .groupByKey
+      .reduce(_ + _)
+
+  }
+
+
+  /**
+    * Creates relationships from members of the population A to members of population B
+    **/
+  def generateDirectionalRelations[A, B](builder: StreamsBuilderS,
+                                         populationA: KTableS[String, A], populationB: KTableS[String, B],
+                                         ngroups: Int, ngroupsPerMember: Int) = {
+
+    val groupedMembersA = groupedRelations(populationA, ngroups, ngroupsPerMember)
+    val groupedMembersB = groupedRelations(populationB, ngroups, ngroupsPerMember)
+
+    groupedMembersA
+      .join(groupedMembersB, (r1: Related, r2: Related) => (r1, r2))
+      .toStream
+      .flatMap { case (gid, (fromAs, toBs)) => fromAs.ids.map(fromAId => fromAId -> toBs) }
+      .groupByKey
+      .reduce(_ + _)
+  }
+
+
+  /**
+    * groups ids of A inside inside instances of Related and return them as a KTable.
+    * The key of the returned group is the group id.
+    **/
+  private def groupedRelations[A](population: KTableS[String, A], nGroups: Int, ngroupsPerMember: Int) = {
     val random = new Random
 
     population
       .toStream
       // assign each person to several random group
-      .flatMap { case (memberId, _) => (1 to ngroupsPerMember).map( _ => random.nextInt(nGroups) -> Related(memberId) ) }
+      .flatMap { case (memberId, _) => (1 to ngroupsPerMember).map(_ => random.nextInt(nGroups) -> Related(memberId)) }
 
       // from each group, builds the set of all members in it
-      .groupByKey.reduce( _ + _)
-
-      // for each person in the group, mark all the other people as their friends
-      .toStream
-      .flatMap { case (groupId, friends) =>
-        friends.ids.map { id => id -> (friends - id) }
-      }
       .groupByKey.reduce(_ + _)
 
   }
