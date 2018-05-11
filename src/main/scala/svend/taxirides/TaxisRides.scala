@@ -12,7 +12,7 @@ import svend.toolkit.{Population, Related, Relationship, Stories}
 
 /**
   * Main entry-point of the project
-  * */
+  **/
 object TaxiRides extends App {
 
   val nClients = 50
@@ -23,27 +23,27 @@ object TaxiRides extends App {
   // taxis clients, will trigger the taxi rides scenario
   val clientsPopulation = Population.populateMembers[Client](builder, nClients, Client.clientGen,
     classOf[ClientSerializer], Config.topics.clientPopulation)
-  clientsPopulation.toStream.print(Printed.toSysOut[String, Client])
+  //  clientsPopulation.toStream.print(Printed.toSysOut[String, Client])
 
   // zone population, representing geographical zones where clients are taxis are located
   val zonePopulation = Population.populateMembers[Zone](builder, nZones, Zone.zoneGen,
     classOf[ZoneSerializer], Config.topics.zonePopulation)
-  zonePopulation.toStream.print(Printed.toSysOut[String, Zone])
+  //  zonePopulation.toStream.print(Printed.toSysOut[String, Zone])
 
   // client's favourite locations: when a taxi ride is generated, each client will go to one of their
   // favourite locations
   val favouriteLocations = Relationship.generateDirectionalRelations(builder,
-    clientsPopulation, zonePopulation, nZones/ 2, 2)
+    clientsPopulation, zonePopulation, nZones / 2, 2)
 
-//  val friendsRelationship = Relationship.generateBidirectionalRelations(builder,
-//    clientsPopulation, nClients/ 3, 2)
+  //  val friendsRelationship = Relationship.generateBidirectionalRelations(builder,
+  //    clientsPopulation, nClients/ 3, 2)
 
-  favouriteLocations.toStream.print(Printed.toSysOut[String, Related])
+  //  favouriteLocations.toStream.print(Printed.toSysOut[String, Related])
 
-//  friendsRelationship.toStream.print(Printed.toSysOut[String, Related])
+  //  friendsRelationship.toStream.print(Printed.toSysOut[String, Related])
 
-  val taxiRidesLogs = TaxiRidesScenario.addTaxiRidesStory(builder, clientsPopulation)
-//  taxiRidesLogs.print(Printed.toSysOut[String, String])
+  val taxiRidesLogs = TaxiRidesScenario.addTaxiRidesStory(builder, clientsPopulation, favouriteLocations)
+  taxiRidesLogs.print(Printed.toSysOut[String, TaxiRide])
 
   val app = new KafkaStreams(builder.build, Config.kafkaStreamsProps)
 
@@ -54,27 +54,32 @@ object TaxiRides extends App {
 
 }
 
+case class TaxiRide(clientId: String, destinationId: String) {
+  override def toString: String = s"(clientId: $clientId, destinationId: $destinationId)"
+}
 
 /**
   * utility methods to create the various parts of the taxi rides scenario
-  * */
+  **/
 object TaxiRidesScenario {
 
   /**
     * Builds the taxi ride story, in which Clients hail taxis in their current zone and get a ride
     * to one of their favourite zones.
-    * */
-  def addTaxiRidesStory(builder: StreamsBuilderS, clientsPopulation: KTableS[String, Client]) = {
+    **/
+  def addTaxiRidesStory(builder: StreamsBuilderS,
+                        clientsPopulation: KTableS[String, Client],
+                        favouriteLocations: KTableS[String, Related]) = {
+    Stories
 
-    // at the moment, we just trigger the "taxi ride" story repeatedly for random actors, and nothing else happens after...
-    val triggeredIdStream = Stories
+      // trigger this story for some actors, repeatedly
       .buildTrigger(builder, "taxiRides", clientsPopulation)
 
-    // TODO:
-    // add a selectOne Transformer the RelationShip in the toolkit, similarly to the Trigger => has acces to the statestore
-    // and just calls a selectOne from there
+      // select a random location amount that client's favourite locations
+      .join(favouriteLocations, (clientId: String, locations: Related) => (clientId, locations.selectOne))
 
-    triggeredIdStream
+      .mapValues { case (clientId: String, destinationId: String) => TaxiRide(clientId, destinationId) }
+
 
   }
 
