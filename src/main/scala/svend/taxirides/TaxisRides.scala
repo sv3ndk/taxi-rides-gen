@@ -23,12 +23,10 @@ object TaxiRides extends App {
   // taxis clients, will trigger the taxi rides scenario
   val clientsPopulation = Population.populateMembers[Client](builder, nClients, Client.clientGen,
     classOf[ClientSerializer], Config.topics.clientPopulation)
-  //  clientsPopulation.toStream.print(Printed.toSysOut[String, Client])
 
   // zone population, representing geographical zones where clients are taxis are located
   val zonePopulation = Population.populateMembers[Zone](builder, nZones, Zone.zoneGen,
     classOf[ZoneSerializer], Config.topics.zonePopulation)
-  //  zonePopulation.toStream.print(Printed.toSysOut[String, Zone])
 
   // client's favourite locations: when a taxi ride is generated, each client will go to one of their
   // favourite locations
@@ -37,10 +35,6 @@ object TaxiRides extends App {
 
   //  val friendsRelationship = Relationship.generateBidirectionalRelations(builder,
   //    clientsPopulation, nClients/ 3, 2)
-
-  //  favouriteLocations.toStream.print(Printed.toSysOut[String, Related])
-
-  //  friendsRelationship.toStream.print(Printed.toSysOut[String, Related])
 
   val taxiRidesLogs = TaxiRidesScenario.addTaxiRidesStory(builder, clientsPopulation, favouriteLocations)
   taxiRidesLogs.print(Printed.toSysOut[String, TaxiRide])
@@ -54,8 +48,8 @@ object TaxiRides extends App {
 
 }
 
-case class TaxiRide(clientId: String, destinationId: String) {
-  override def toString: String = s"(clientId: $clientId, destinationId: $destinationId)"
+case class TaxiRide(clientId: String, clientName: String, destinationId: String) {
+  override def toString: String = s"(clientId: $clientId, clientName: $clientName, destinationId: $destinationId)"
 }
 
 /**
@@ -70,15 +64,22 @@ object TaxiRidesScenario {
   def addTaxiRidesStory(builder: StreamsBuilderS,
                         clientsPopulation: KTableS[String, Client],
                         favouriteLocations: KTableS[String, Related]) = {
+
+    import DamnYouSerdes._
+
     Stories
 
       // trigger this story for some actors, repeatedly
       .buildTrigger(builder, "taxiRides", clientsPopulation)
 
-      // select a random location amount that client's favourite locations
+      // select a random destination location among that client's favourite locations
       .join(favouriteLocations, (clientId: String, locations: Related) => (clientId, locations.selectOne))
 
-      .mapValues { case (clientId: String, destinationId: String) => TaxiRide(clientId, destinationId) }
+      // looks up client's attributes
+      .join(clientsPopulation, (clDest: (String, String), client: Client) => (clDest._1, client.name, clDest._2) )
+
+      // wraps it all up into a TaxiRide element
+      .mapValues { case (clientId: String, clientName: String, destinationId: String) => TaxiRide(clientId, clientName, destinationId) }
 
 
   }
