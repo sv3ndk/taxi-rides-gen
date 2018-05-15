@@ -1,8 +1,11 @@
 package svend.taxirides
 
+import java.io.{ByteArrayInputStream, ByteArrayOutputStream}
+
 import com.lightbend.kafka.scala.streams.DefaultSerdes._
 import com.lightbend.kafka.scala.streams.ImplicitConversions._
-import com.lightbend.kafka.scala.streams.{KTableS, StreamsBuilderS}
+import com.lightbend.kafka.scala.streams._
+import com.sksamuel.avro4s.{AvroInputStream, AvroOutputStream}
 import org.apache.kafka.streams.KafkaStreams
 import org.apache.kafka.streams.kstream.Printed
 import svend.taxirides.Client.ClientSerializer
@@ -42,14 +45,43 @@ object TaxiRides extends App {
   val app = new KafkaStreams(builder.build, Config.kafkaStreamsProps)
 
   // resets the state: for a data-generator, this is necessary since we have no input data: we want to
-  // forget any past state between execution and start creating new one
+  // forget any past state between executions and start creating new one
   app.cleanUp()
   app.start()
 
 }
 
-case class TaxiRide(clientId: String, clientName: String, destinationId: String) {
-  override def toString: String = s"(clientId: $clientId, clientName: $clientName, destinationId: $destinationId)"
+case class TaxiRide(clientId: String, clientName: String, origin: Option[String], destinationId: String) {
+  override def toString: String = {
+    val fromZoneName = origin.getOrElse("unknown")
+    s"(clientId: $clientId, clientName: $clientName, origin: ${origin.getOrElse("unknown")}, destinationId: $destinationId)"
+  }
+}
+
+object TaxiRide {
+
+  implicit object Serdes extends ScalaSerde[TaxiRide] {
+
+    override def serializer() = new Serializer[TaxiRide] {
+      override def serialize(data: TaxiRide): Array[Byte] = {
+        val baos = new ByteArrayOutputStream()
+        val output = AvroOutputStream.binary[TaxiRide](baos)
+        output.write(data)
+        output.close()
+        baos.toByteArray
+      }
+    }
+
+    override def deserializer() = new Deserializer[TaxiRide] {
+      override def deserialize(data: Array[Byte]): Option[TaxiRide] = {
+        val in = new ByteArrayInputStream(data)
+        val input = AvroInputStream.binary[TaxiRide](in)
+        Option(input.iterator.toSeq.head)
+      }
+    }
+
+  }
+
 }
 
 /**
@@ -67,7 +99,8 @@ object TaxiRidesScenario {
 
     import DamnYouSerdes._
 
-    Stories
+    // main story logic: generates taxi rides from various populations and relationships
+    val taxiRideLogs = Stories
 
       // trigger this story for some actors, repeatedly
       .buildTrigger(builder, "taxiRides", clientsPopulation)
@@ -76,11 +109,20 @@ object TaxiRidesScenario {
       .join(favouriteLocations, (clientId: String, locations: Related) => (clientId, locations.selectOne))
 
       // looks up client's attributes
-      .join(clientsPopulation, (clDest: (String, String), client: Client) => (clDest._1, client.name, clDest._2) )
+      .join(clientsPopulation, (clDest: (String, String), client: Client) =>
+        (clDest._1, client.name, client.currentLocation, clDest._2))
 
-      // wraps it all up into a TaxiRide element
-      .mapValues { case (clientId: String, clientName: String, destinationId: String) => TaxiRide(clientId, clientName, destinationId) }
+      // wraps it all up into a TaxiRide instance
+      .mapValues { case (clientId: String, clientName: String, origin: Option[String], destinationId: String) =>
+        TaxiRide(clientId, clientName, origin, destinationId)
+    }
 
+    // updates the client's changelog by setting the new current location to their latest taxi ride destination
+    taxiRideLogs
+      .join(clientsPopulation, (ride: TaxiRide, client: Client) => client.copy(currentLocation = Some(ride.destinationId)))
+      .to(Config.topics.clientPopulation)
+
+    taxiRideLogs
 
   }
 

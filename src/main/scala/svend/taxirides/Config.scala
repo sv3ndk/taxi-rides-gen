@@ -12,11 +12,11 @@ object Config {
     val zonePopulation = "taxirides-population-zones"
   }
 
-  def kafkaProducerProps= {
+  def kafkaProducerProps = {
     val props = new Properties()
     props.put("bootstrap.servers", "localhost:9092")
 
-    // by convention, we serialize all keys as String
+    // to keep things simple, all keys of this programme are String
     props.put("key.serializer", classOf[StringSerializer].getName)
 
     // super brittle config: this is a simulator, we care about speed and don't care if we drop stuff on the floor
