@@ -2,6 +2,8 @@
 
 This is a quick proof of concept of a data generator based on Kafka Streams. Most of the concepts are inspired from [Trumania](https://github.com/RealImpactAnalytics/trumania), in a much more basic but also more scalable fashion.
 
+The entry point of the project is [TaxiRides.scala](src/main/scala/svend/taxirides/TaxisRides.scala), which contains the simulation scenario.
+
 
 In order to run, first create the necessary Kafka topics:
 
@@ -40,7 +42,7 @@ In order to run, first create the necessary Kafka topics:
   --zookeeper localhost:2181            \
   --partitions 1                        \
   --replication-factor 1                \
-  --topic taxirides-tech-zonedistance
+  --topic taxirides-tech-zonedistance2
 
   # technical topic, used by doing the last key-by client
   kafka-topics                            \
@@ -48,7 +50,7 @@ In order to run, first create the necessary Kafka topics:
   --zookeeper localhost:2181            \
   --partitions 1                        \
   --replication-factor 1                \
-  --topic taxirides-tech-keybyclient
+  --topic taxirides-tech-keybyclient2
 
 ```
 

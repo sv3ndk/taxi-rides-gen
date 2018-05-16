@@ -71,8 +71,8 @@ object Relationship {
     * For every relation from a to b, there will be a relation from b to a
     *
     **/
-  def generateBidirectionalRelations[A](builder: StreamsBuilderS, population: KTableS[String, A],
-                                        nGroups: Int, ngroupsPerMember: Int): KTableS[String, Related] = {
+  def generateBidirectionalRelations[MA <: PopulationMember](builder: StreamsBuilderS, population: Population[MA],
+                                                             nGroups: Int, ngroupsPerMember: Int): KTableS[String, Related] = {
 
     val groupedMembers = groupedRelations(population, nGroups, ngroupsPerMember)
 
@@ -87,11 +87,12 @@ object Relationship {
 
 
   /**
-    * Creates relationships from members of the population A to members of population B
+    * Creates relationships from each members of the population A to `ngroupsPerMember` members of population B
     **/
-  def generateDirectionalRelations[A, B](builder: StreamsBuilderS,
-                                         populationA: KTableS[String, A], populationB: KTableS[String, B],
-                                         ngroups: Int, ngroupsPerMember: Int) = {
+  def generateDirectionalRelations[MA <: PopulationMember, MB <: PopulationMember]
+  (populationA: Population[MA], populationB: Population[MB],
+   ngroups: Int, ngroupsPerMember: Int)
+  (implicit builder: StreamsBuilderS) = {
 
     val groupedMembersA = groupedRelations(populationA, ngroups, ngroupsPerMember)
     val groupedMembersB = groupedRelations(populationB, ngroups, ngroupsPerMember)
@@ -109,10 +110,10 @@ object Relationship {
     * groups ids of A inside inside instances of Related and return them as a KTable.
     * The key of the returned group is the group id.
     **/
-  private def groupedRelations[A](population: KTableS[String, A], nGroups: Int, ngroupsPerMember: Int) = {
+  private def groupedRelations[M <: PopulationMember](population: Population[M], nGroups: Int, ngroupsPerMember: Int) = {
     val random = new Random
 
-    population
+    population.members
       .toStream
       // assign each person to several random group
       .flatMap { case (memberId, _) => (1 to ngroupsPerMember).map(_ => random.nextInt(nGroups) -> Related(memberId)) }
@@ -121,6 +122,5 @@ object Relationship {
       .groupByKey.reduce(_ + _)
 
   }
-
 
 }

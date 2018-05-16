@@ -8,8 +8,6 @@ import com.lightbend.kafka.scala.streams._
 import com.sksamuel.avro4s.{AvroInputStream, AvroOutputStream}
 import org.apache.kafka.streams.KafkaStreams
 import org.apache.kafka.streams.kstream.Printed
-import svend.taxirides.Client.ClientSerializer
-import svend.taxirides.Zone.ZoneSerializer
 import svend.toolkit.{Population, Related, Relationship, Stories}
 
 
@@ -21,27 +19,25 @@ object TaxiRides extends App {
   val nClients = 50
   val nZones = 24
 
-  val builder = new StreamsBuilderS
-
-  // taxis clients, will trigger the taxi rides scenario
-  val clientsPopulation = Population.populateMembers[Client](builder, Client.clientGen(nClients),
-    classOf[ClientSerializer], Config.topics.clientPopulation)
+  implicit val builder = new StreamsBuilderS
 
   // zone population, representing geographical zones where clients are taxis are located
-  val zonePopulation = Population.populateMembers[Zone](builder, ZonePopulation.zoneGen(nZones),
-    classOf[ZoneSerializer], Config.topics.zonePopulation)
+  val zonePopulation = ZonePopulation(nZones)
+
+  // taxis clients, will trigger the taxi rides scenario
+  val clientsPopulation = ClientPopulation(nClients, zonePopulation)
 
   // client's favourite locations: when a taxi ride is generated, each client will go to one of their
   // favourite locations
-  val favouriteLocations = Relationship.generateDirectionalRelations(builder,
+  val favouriteLocations = Relationship.generateDirectionalRelations(
     clientsPopulation, zonePopulation, nZones / 2, 2)
 
-  val zone2ZoneDistances = ZonePopulation.zoneToZoneDistanceRelationship(builder, nZones)
+  val zone2ZoneDistances = ZonePopulation.zoneToZoneDistanceRelationship(zonePopulation)
 
   //  val friendsRelationship = Relationship.generateBidirectionalRelations(builder,
   //    clientsPopulation, nClients/ 3, 2)
 
-  val taxiRidesLogs = TaxiRidesScenario.addTaxiRidesStory(builder, clientsPopulation, favouriteLocations, zone2ZoneDistances)
+  val taxiRidesLogs = TaxiRidesScenario.addTaxiRidesStory(clientsPopulation, favouriteLocations, zone2ZoneDistances)
   taxiRidesLogs.print(Printed.toSysOut[String, TaxiRide])
 
   val app = new KafkaStreams(builder.build, Config.kafkaStreamsProps)
@@ -53,10 +49,9 @@ object TaxiRides extends App {
 
 }
 
-case class TaxiRide(clientId: String, clientName: String, origin: Option[String], destinationId: String, distance: Double) {
+case class TaxiRide(clientId: String, clientName: String, fromZone: String, toZone: String, distance: Double) {
   override def toString: String = {
-    val fromZoneName = origin.getOrElse("unknown")
-    f"(clientId: $clientId, clientName: $clientName, origin: ${origin.getOrElse("unknown")}, destinationId: $destinationId, distance: $distance%.3f)"
+    f"(clientId: $clientId, clientName: $clientName, from: $fromZone, destinationId: $toZone, distance: $distance%.3f)"
   }
 }
 
@@ -95,11 +90,10 @@ object TaxiRidesScenario {
     * Builds the taxi ride story, in which Clients hail taxis in their current zone and get a ride
     * to one of their favourite zones.
     **/
-  def addTaxiRidesStory(builder: StreamsBuilderS,
-                        clientsPopulation: KTableS[String, Client],
+  def addTaxiRidesStory(clientsPopulation: Population[Client],
                         favouriteLocations: KTableS[String, Related],
-                        zone2ZoneDistances: KTableS[(String, String), Double]
-                       ) = {
+                        zone2ZoneDistances: KTableS[(String, String), Double])
+                       (implicit builder: StreamsBuilderS) = {
 
     import DamnYouSerdes._
 
@@ -113,28 +107,28 @@ object TaxiRidesScenario {
       .join(favouriteLocations, (clientId: String, locations: Related) => (clientId, locations.selectOne))
 
       // looks up client's attributes
-      .join(clientsPopulation, (clDest: (String, String), client: Client) =>
+      .join(clientsPopulation.members, (clDest: (String, String), client: Client) =>
       (clDest._1, client.name, client.currentLocation, clDest._2))
 
       // looks up the distance between those two zones
-      .selectKey { case (key, (_, _, maybeFrom, to)) => (maybeFrom.getOrElse("z-1"), to) }
+      .selectKey { case (key, (_, _, fromZone, toZone)) => (fromZone, toZone) }
       .through(Config.topics.storyShuffleDistance)
       .join(zone2ZoneDistances,
-        (ride: (String, String, Option[String], String), distance: Double) =>
+        (ride: (String, String, String, String), distance: Double) =>
           (ride._1, ride._2, ride._3, ride._4, distance)
       )
 
       // wraps it all up into a TaxiRide instance
       .mapValues {
-          case (clientId: String, clientName: String, origin: Option[String], destinationId: String, distance: Double) =>
-             TaxiRide(clientId, clientName, origin, destinationId, distance)
-       }
+      case (clientId: String, clientName: String, fromZone: String, toZone: String, distance: Double) =>
+        TaxiRide(clientId, clientName, fromZone, toZone, distance)
+    }
       .selectKey((k, ride) => ride.clientId)
       .through(Config.topics.storyShuffleKeyByClient)
 
     // updates the client's changelog by setting the new current location to their latest taxi ride destination
     taxiRideLogs
-      .join(clientsPopulation, (ride: TaxiRide, client: Client) => client.copy(currentLocation = Some(ride.destinationId)))
+      .join(clientsPopulation.members, (ride: TaxiRide, client: Client) => client.copy(currentLocation = ride.toZone))
       .to(Config.topics.clientPopulation)
 
     taxiRideLogs

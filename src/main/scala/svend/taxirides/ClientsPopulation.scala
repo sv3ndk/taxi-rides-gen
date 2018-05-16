@@ -4,20 +4,48 @@ import java.io.{ByteArrayInputStream, ByteArrayOutputStream}
 
 import com.lightbend.kafka.scala.streams._
 import com.sksamuel.avro4s._
-import svend.toolkit.{Generators, PopulationMember}
+import org.apache.kafka.streams.Consumed
+import svend.taxirides.Client.ClientSerializer
+import svend.toolkit.{Generators, Population, PopulationMember}
+
+import scala.util.Random
+
+
+object ClientPopulation {
+
+  def apply(size: Int, zonePopulation: Population[Zone])(implicit builder: StreamsBuilderS, consumed: Consumed[String, Client]) =
+    new Population[Client] {
+      override val allMemberids = Generators.sequencialGen("cl").take(size)
+
+      override def randomMemberId: String = s"cl-${Random.nextInt(size)}"
+
+      /**
+        * create a client this this member id, a random name and a random initial zone (picked form the zone population)
+        * */
+      def randomClient(id: String) = Client(id, Generators.englishNameGen(), zonePopulation.randomMemberId)
+
+      /**
+      * provides one random member id of this population
+      **/
+      override val members = Population.build(
+        allMemberids.map(randomClient),
+        Config.topics.clientPopulation,
+        classOf[ClientSerializer],
+        builder
+      )
+
+    }
+
+}
+
 
 /**
   * Client are the agent that are part of a population. THey only contain an id
   * for now, we'll add more attributes later,...
   * */
-case class Client(id: String, name: String, currentLocation: Option[String]) extends PopulationMember
+case class Client(id: String, name: String, currentLocation: String) extends PopulationMember
 
 object Client {
-
-  /**
-    * Generator of random Client population members
-    * */
-  def clientGen(size: Int) = Generators.sequencialGen("cl").map(Client(_, Generators.englishNameGen(), None)).take(size)
 
   implicit object ClientSerdes extends ScalaSerde[Client] {
     override def deserializer() = new ClientDeserializer

@@ -8,7 +8,9 @@ import com.lightbend.kafka.scala.streams._
 import com.sksamuel.avro4s.{AvroInputStream, AvroOutputStream}
 import org.apache.kafka.clients.producer.{KafkaProducer, ProducerRecord}
 import org.apache.kafka.common.serialization.DoubleSerializer
-import svend.toolkit.{Generators, PopulationMember}
+import svend.taxirides.Client.ClientSerializer
+import svend.taxirides.Zone.ZoneSerializer
+import svend.toolkit.{Generators, Population, PopulationMember}
 
 import scala.util.Random
 
@@ -43,21 +45,36 @@ object Zone {
 }
 
 
+/**
+  * Population of geo-graphical zones. Each taxi ride will occur from a zone to another
+  * */
 object ZonePopulation {
 
-  def zoneIdGen(size: Int) = Generators.sequencialGen("z").take(size)
-  def zoneGen(size: Int) = zoneIdGen(size).map(Zone(_))
+  def apply(nZones: Int)(implicit builder: StreamsBuilderS) = new Population[Zone] {
+
+    override val allMemberids = Generators.sequencialGen("z").take(nZones)
+
+    override def randomMemberId: String = s"z-${Random.nextInt(nZones)}"
+
+    override val members = Population.build(
+      allMemberids.map(Zone(_)),
+      Config.topics.zonePopulation,
+      classOf[ZoneSerializer],
+      builder
+    )
+  }
+
 
   /**
     * Builds a random KTable with an entry for each pair of zone and a random double as distance between those two zones
     * */
-  def zoneToZoneDistanceRelationship(builder:  StreamsBuilderS, nZones: Int) = {
+  def zoneToZoneDistanceRelationship(zonePopulation: Population[Zone])(implicit builder: StreamsBuilderS) = {
 
     import DamnYouSerdes._
 
     val pairsGen = for {
-      z1 <- zoneIdGen(nZones)
-      z2 <- zoneIdGen(nZones)
+      z1 <- zonePopulation.allMemberids
+      z2 <- zonePopulation.allMemberids
     } yield (z1, z2)
 
 

@@ -19,7 +19,7 @@ object Stories {
     * This returns a KStreamsS of Population Member ids events, when they are triggered
     *   => the rest of the story can then be written as a transformation of those IDs
     */
-  def buildTrigger[M](builder: StreamsBuilderS, storyName: String, population: KTableS[String, M]) = {
+  def buildTrigger[M <: PopulationMember](builder: StreamsBuilderS, storyName: String, population: Population[M]) = {
 
     val timerStoreName = s"${storyName}Timers"
     val timerStoreSupplier = Stores.inMemoryKeyValueStore(timerStoreName)
@@ -34,6 +34,7 @@ object Stories {
     builder.addStateStore(timerStoreBuilder)
 
     population
+      .members
       .toStream
       .transform(() => new StoryTrigger[M](timerStoreName), timerStoreName)
 

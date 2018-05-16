@@ -13,8 +13,8 @@ object Config {
     val zone2ZoneDistanceRelations = "taxirides-relationship-zones2zonedistance"
 
     // a few topics only required for technical shuffles (in joins)
-    val storyShuffleDistance = "taxirides-tech-zonedistance"
-    val storyShuffleKeyByClient = "taxirides-tech-keybyclient"
+    val storyShuffleDistance = "taxirides-tech-zonedistance2"
+    val storyShuffleKeyByClient = "taxirides-tech-keybyclient2"
   }
 
   def kafkaProducerProps = {
