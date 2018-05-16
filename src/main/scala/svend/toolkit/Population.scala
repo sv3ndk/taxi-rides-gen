@@ -15,7 +15,7 @@ object Population {
   /**
     * generates memeber of this population and push them to a (compacted) Kafka topic
     * */
-  def populateMembers[M <: PopulationMember ](builder:  StreamsBuilderS, n: Int, memberGenerator: Stream[M],
+  def populateMembers[M <: PopulationMember ](builder:  StreamsBuilderS, memberGenerator: Stream[M],
                                               memberSerializerClass: Class[_ <: Serializer[M]], kafkaTopic: String)
                                              (implicit consumed: Consumed[String, M])= {
 
@@ -25,7 +25,6 @@ object Population {
     val clientProducer = new KafkaProducer[String, M](props)
 
     memberGenerator
-      .take(n)
       .foreach { member => clientProducer.send( new ProducerRecord(kafkaTopic, member.id, member) ) }
 
     clientProducer.close()

@@ -24,11 +24,11 @@ object TaxiRides extends App {
   val builder = new StreamsBuilderS
 
   // taxis clients, will trigger the taxi rides scenario
-  val clientsPopulation = Population.populateMembers[Client](builder, nClients, Client.clientGen,
+  val clientsPopulation = Population.populateMembers[Client](builder, Client.clientGen(nClients),
     classOf[ClientSerializer], Config.topics.clientPopulation)
 
   // zone population, representing geographical zones where clients are taxis are located
-  val zonePopulation = Population.populateMembers[Zone](builder, nZones, Zone.zoneGen,
+  val zonePopulation = Population.populateMembers[Zone](builder, ZonePopulation.zoneGen(nZones),
     classOf[ZoneSerializer], Config.topics.zonePopulation)
 
   // client's favourite locations: when a taxi ride is generated, each client will go to one of their
@@ -36,10 +36,12 @@ object TaxiRides extends App {
   val favouriteLocations = Relationship.generateDirectionalRelations(builder,
     clientsPopulation, zonePopulation, nZones / 2, 2)
 
+  val zone2ZoneDistances = ZonePopulation.zoneToZoneDistanceRelationship(builder, nZones)
+
   //  val friendsRelationship = Relationship.generateBidirectionalRelations(builder,
   //    clientsPopulation, nClients/ 3, 2)
 
-  val taxiRidesLogs = TaxiRidesScenario.addTaxiRidesStory(builder, clientsPopulation, favouriteLocations)
+  val taxiRidesLogs = TaxiRidesScenario.addTaxiRidesStory(builder, clientsPopulation, favouriteLocations, zone2ZoneDistances)
   taxiRidesLogs.print(Printed.toSysOut[String, TaxiRide])
 
   val app = new KafkaStreams(builder.build, Config.kafkaStreamsProps)
@@ -51,10 +53,10 @@ object TaxiRides extends App {
 
 }
 
-case class TaxiRide(clientId: String, clientName: String, origin: Option[String], destinationId: String) {
+case class TaxiRide(clientId: String, clientName: String, origin: Option[String], destinationId: String, distance: Double) {
   override def toString: String = {
     val fromZoneName = origin.getOrElse("unknown")
-    s"(clientId: $clientId, clientName: $clientName, origin: ${origin.getOrElse("unknown")}, destinationId: $destinationId)"
+    f"(clientId: $clientId, clientName: $clientName, origin: ${origin.getOrElse("unknown")}, destinationId: $destinationId, distance: $distance%.3f)"
   }
 }
 
@@ -95,7 +97,9 @@ object TaxiRidesScenario {
     **/
   def addTaxiRidesStory(builder: StreamsBuilderS,
                         clientsPopulation: KTableS[String, Client],
-                        favouriteLocations: KTableS[String, Related]) = {
+                        favouriteLocations: KTableS[String, Related],
+                        zone2ZoneDistances: KTableS[(String, String), Double]
+                       ) = {
 
     import DamnYouSerdes._
 
@@ -110,12 +114,23 @@ object TaxiRidesScenario {
 
       // looks up client's attributes
       .join(clientsPopulation, (clDest: (String, String), client: Client) =>
-        (clDest._1, client.name, client.currentLocation, clDest._2))
+      (clDest._1, client.name, client.currentLocation, clDest._2))
+
+      // looks up the distance between those two zones
+      .selectKey { case (key, (_, _, maybeFrom, to)) => (maybeFrom.getOrElse("z-1"), to) }
+      .through(Config.topics.storyShuffleDistance)
+      .join(zone2ZoneDistances,
+        (ride: (String, String, Option[String], String), distance: Double) =>
+          (ride._1, ride._2, ride._3, ride._4, distance)
+      )
 
       // wraps it all up into a TaxiRide instance
-      .mapValues { case (clientId: String, clientName: String, origin: Option[String], destinationId: String) =>
-        TaxiRide(clientId, clientName, origin, destinationId)
-    }
+      .mapValues {
+          case (clientId: String, clientName: String, origin: Option[String], destinationId: String, distance: Double) =>
+             TaxiRide(clientId, clientName, origin, destinationId, distance)
+       }
+      .selectKey((k, ride) => ride.clientId)
+      .through(Config.topics.storyShuffleKeyByClient)
 
     // updates the client's changelog by setting the new current location to their latest taxi ride destination
     taxiRideLogs

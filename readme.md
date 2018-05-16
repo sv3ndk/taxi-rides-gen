@@ -25,24 +25,50 @@ In order to run, first create the necessary Kafka topics:
   --config cleanup.policy=compact   \
   --topic taxirides-population-zones
 
+# changelog for zone to zone distance matrix
+  kafka-topics                            \
+  --create                              \
+  --zookeeper localhost:2181            \
+  --partitions 1                        \
+  --replication-factor 1                \
+  --config cleanup.policy=compact   \
+  --topic taxirides-relationship-zones2zonedistance
+
+  # technical topic, used for the shuffle when looking up zone-to-zone disatnce
+  kafka-topics                            \
+  --create                              \
+  --zookeeper localhost:2181            \
+  --partitions 1                        \
+  --replication-factor 1                \
+  --topic taxirides-tech-zonedistance
+
+  # technical topic, used by doing the last key-by client
+  kafka-topics                            \
+  --create                              \
+  --zookeeper localhost:2181            \
+  --partitions 1                        \
+  --replication-factor 1                \
+  --topic taxirides-tech-keybyclient
+
 ```
 
 Then simply launch `run` from the sbt console. The console should start outputing random taxi rides similar to:
 
 ```sh
-[info] [KSTREAM-MAPVALUES-0000000037]: cl-49, (clientId: cl-49, clientName: Dave Magnetsham, origin: z-3, destinationId: z-16)
-[info] [KSTREAM-MAPVALUES-0000000037]: cl-0, (clientId: cl-0, clientName: Mark O'Tooleford, origin: z-3, destinationId: z-18)
-[info] [KSTREAM-MAPVALUES-0000000037]: cl-30, (clientId: cl-30, clientName: Natalie Doonford, origin: z-20, destinationId: z-15)
-[info] [KSTREAM-MAPVALUES-0000000037]: cl-22, (clientId: cl-22, clientName: Maggie Rafferty, origin: z-8, destinationId: z-7)
-[info] [KSTREAM-MAPVALUES-0000000037]: cl-28, (clientId: cl-28, clientName: Kelly Raffertyham, origin: z-6, destinationId: z-12)
-[info] [KSTREAM-MAPVALUES-0000000037]: cl-22, (clientId: cl-22, clientName: Maggie Rafferty, origin: z-7, destinationId: z-20)
-[info] [KSTREAM-MAPVALUES-0000000037]: cl-39, (clientId: cl-39, clientName: Gavin Jones, origin: z-15, destinationId: z-8)
-[info] [KSTREAM-MAPVALUES-0000000037]: cl-10, (clientId: cl-10, clientName: Gladys Yarisham, origin: z-0, destinationId: z-1)
-[info] [KSTREAM-MAPVALUES-0000000037]: cl-20, (clientId: cl-20, clientName: Dan Gravelson, origin: z-12, destinationId: z-10)
-[info] [KSTREAM-MAPVALUES-0000000037]: cl-42, (clientId: cl-42, clientName: Maggie Greenston, origin: z-1, destinationId: z-20)
-[info] [KSTREAM-MAPVALUES-0000000037]: cl-8, (clientId: cl-8, clientName: Kathryn Gravis, origin: z-21, destinationId: z-13)
-[info] [KSTREAM-MAPVALUES-0000000037]: cl-13, (clientId: cl-13, clientName: Barry Magnets, origin: z-13, destinationId: z-10)
-
+[info] [KSTREAM-SOURCE-0000000047]: cl-32, (clientId: cl-32, clientName: Deidre Evanston, origin: z-21, destinationId: z-9, distance: 9.118)
+[info] [KSTREAM-SOURCE-0000000047]: cl-39, (clientId: cl-39, clientName: Sam Smith, origin: z-23, destinationId: z-17, distance: 4.528)
+[info] [KSTREAM-SOURCE-0000000047]: cl-41, (clientId: cl-41, clientName: Naeem Baker, origin: z-6, destinationId: z-8, distance: 7.241)
+[info] [KSTREAM-SOURCE-0000000047]: cl-25, (clientId: cl-25, clientName: Natalie O'Toole, origin: z-14, destinationId: z-12, distance: 3.083)
+[info] [KSTREAM-SOURCE-0000000047]: cl-40, (clientId: cl-40, clientName: Dave Dingleham, origin: z-17, destinationId: z-8, distance: 6.506)
+[info] [KSTREAM-SOURCE-0000000047]: cl-12, (clientId: cl-12, clientName: Sam Havilland, origin: z-13, destinationId: z-14, distance: 7.676)
+[info] [KSTREAM-SOURCE-0000000047]: cl-15, (clientId: cl-15, clientName: Naeem Schistton, origin: z-1, destinationId: z-16, distance: 5.112)
+[info] [KSTREAM-SOURCE-0000000047]: cl-42, (clientId: cl-42, clientName: Mark Magnets, origin: z-17, destinationId: z-16, distance: 7.819)
+[info] [KSTREAM-SOURCE-0000000047]: cl-44, (clientId: cl-44, clientName: David Magnets, origin: z-11, destinationId: z-2, distance: 5.395)
+[info] [KSTREAM-SOURCE-0000000047]: cl-5, (clientId: cl-5, clientName: Sally Magnets-Alan, origin: z-20, destinationId: z-11, distance: 3.038)
+[info] [KSTREAM-SOURCE-0000000047]: cl-10, (clientId: cl-10, clientName: Kate Schistham, origin: z-21, destinationId: z-19, distance: 3.957)
+[info] [KSTREAM-SOURCE-0000000047]: cl-18, (clientId: cl-18, clientName: Terry Partridge, origin: z-16, destinationId: z-20, distance: 4.766)
+[info] [KSTREAM-SOURCE-0000000047]: cl-37, (clientId: cl-37, clientName: Alan Corby, origin: z-8, destinationId: z-7, distance: 6.349)
+[info] [KSTREAM-SOURCE-0000000047]: cl-48, (clientId: cl-48, clientName: Kevin Dingle, origin: z-11, destinationId: z-2, distance: 5.395)
 
 ```
 

@@ -17,7 +17,7 @@ object Client {
   /**
     * Generator of random Client population members
     * */
-  val clientGen = Generators.sequencialGen("cl").map(Client(_, Generators.englishNameGen(), None))
+  def clientGen(size: Int) = Generators.sequencialGen("cl").map(Client(_, Generators.englishNameGen(), None)).take(size)
 
   implicit object ClientSerdes extends ScalaSerde[Client] {
     override def deserializer() = new ClientDeserializer

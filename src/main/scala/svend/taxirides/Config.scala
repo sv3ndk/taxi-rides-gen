@@ -10,6 +10,11 @@ object Config {
   object topics {
     val clientPopulation = "taxirides-population-clients"
     val zonePopulation = "taxirides-population-zones"
+    val zone2ZoneDistanceRelations = "taxirides-relationship-zones2zonedistance"
+
+    // a few topics only required for technical shuffles (in joins)
+    val storyShuffleDistance = "taxirides-tech-zonedistance"
+    val storyShuffleKeyByClient = "taxirides-tech-keybyclient"
   }
 
   def kafkaProducerProps = {
