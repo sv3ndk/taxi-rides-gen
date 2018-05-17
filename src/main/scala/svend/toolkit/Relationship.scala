@@ -6,7 +6,6 @@ import com.lightbend.kafka.scala.streams.DefaultSerdes._
 import com.lightbend.kafka.scala.streams.ImplicitConversions._
 import com.lightbend.kafka.scala.streams._
 import com.sksamuel.avro4s.{AvroInputStream, AvroOutputStream}
-import org.apache.kafka.streams.kstream.Printed
 
 import scala.util.Random
 
@@ -25,7 +24,8 @@ case class Related(ids: Set[String]) {
   /** merges two set of relations, with de-duplication */
   def +(other: Related) = new Related(this.ids ++ other.ids)
 
-  def -(removedOne: String) = new Related(this.ids - removedOne)
+  def -(other: Related) = other.ids.foldLeft(this){case (related, removed) => related -- removed}
+  def --(removedOne: String) = new Related(this.ids - removedOne)
 
   def nop(other: Related) = this
 
@@ -35,6 +35,8 @@ case class Related(ids: Set[String]) {
 
 object Related {
   def apply(first: String) = new Related(Set(first))
+
+  val empty = Related(Set.empty[String])
 
   implicit object FriendsSerdes extends ScalaSerde[Related] {
     override def deserializer() = new FriendsDeserializer
@@ -79,7 +81,7 @@ object Relationship {
     // for each member in each group, create a relationship from that member to all other in the same group
     // => this makes the relationship bi-directional
     groupedMembers.toStream
-      .flatMap { case (groupId, friends) => friends.ids.map { id => id -> (friends - id) } }
+      .flatMap { case (groupId, friends) => friends.ids.map { id => id -> (friends -- id) } }
       .groupByKey
       .reduce(_ + _)
 

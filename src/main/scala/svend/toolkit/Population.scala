@@ -14,7 +14,8 @@ trait PopulationMember {
 trait Population[M <: PopulationMember ]{
 
   /**
-    * bounded Stream providing all member ids of this population
+    * bounded Stream providing "all" member ids of this population
+    * (we consider that populations do not grow nor shrink in size for now => size is known from the start)
     * */
   val allMemberids: Stream[String]
 

@@ -16,8 +16,9 @@ import svend.toolkit.{Population, Related, Relationship, Stories}
   **/
 object TaxiRides extends App {
 
-  val nClients = 50
-  val nZones = 24
+  val nClients = 100
+  val nTaxis = 40
+  val nZones = 10
 
   implicit val builder = new StreamsBuilderS
 
@@ -26,6 +27,10 @@ object TaxiRides extends App {
 
   // taxis clients, will trigger the taxi rides scenario
   val clientsPopulation = ClientPopulation(nClients, zonePopulation)
+
+  // taxis themselves, will be part of requested rides, and update their after each ride
+  val taxiPopulation = TaxiPopulation(nTaxis, zonePopulation)
+  val taxiPerZone = TaxiPopulation.taxiPerZoneRelationship(taxiPopulation)
 
   // client's favourite locations: when a taxi ride is generated, each client will go to one of their
   // favourite locations
@@ -37,7 +42,7 @@ object TaxiRides extends App {
   //  val friendsRelationship = Relationship.generateBidirectionalRelations(builder,
   //    clientsPopulation, nClients/ 3, 2)
 
-  val taxiRidesLogs = TaxiRidesScenario.addTaxiRidesStory(clientsPopulation, favouriteLocations, zone2ZoneDistances)
+  val taxiRidesLogs = TaxiRidesScenario.addTaxiRidesStory(clientsPopulation, taxiPopulation, favouriteLocations, zone2ZoneDistances, taxiPerZone)
   taxiRidesLogs.print(Printed.toSysOut[String, TaxiRide])
 
   val app = new KafkaStreams(builder.build, Config.kafkaStreamsProps)
@@ -49,9 +54,9 @@ object TaxiRides extends App {
 
 }
 
-case class TaxiRide(clientId: String, clientName: String, fromZone: String, toZone: String, distance: Double) {
+case class TaxiRide(clientId: String, clientName: String, fromZone: String, toZone: String, distance: Double, taxiId: String) {
   override def toString: String = {
-    f"(clientId: $clientId, clientName: $clientName, from: $fromZone, destinationId: $toZone, distance: $distance%.3f)"
+    f"(clientId: $clientId, clientName: $clientName, withTaxi: $taxiId, from: $fromZone, destinationId: $toZone, distance: $distance%.3f)"
   }
 }
 
@@ -91,8 +96,10 @@ object TaxiRidesScenario {
     * to one of their favourite zones.
     **/
   def addTaxiRidesStory(clientsPopulation: Population[Client],
+                        taxisPopulation: Population[Taxi],
                         favouriteLocations: KTableS[String, Related],
-                        zone2ZoneDistances: KTableS[(String, String), Double])
+                        zone2ZoneDistances: KTableS[(String, String), Double],
+                        taxiPerZoneRelationships: KTableS[String, Related])
                        (implicit builder: StreamsBuilderS) = {
 
     import DamnYouSerdes._
@@ -118,10 +125,18 @@ object TaxiRidesScenario {
           (ride._1, ride._2, ride._3, ride._4, distance)
       )
 
+      // select a random taxi that is available in that zone
+      .selectKey { case (key, (_, _, fromZone, _, _) ) => fromZone}
+      .through(Config.topics.storyShuffleZone)
+      .join(taxiPerZoneRelationships,
+        (ride: (String, String, String, String, Double), taxis: Related) =>
+          (ride._1, ride._2, ride._3, ride._4, ride._5, taxis.selectOne)
+      )
+
       // wraps it all up into a TaxiRide instance
       .mapValues {
-      case (clientId: String, clientName: String, fromZone: String, toZone: String, distance: Double) =>
-        TaxiRide(clientId, clientName, fromZone, toZone, distance)
+      case (clientId: String, clientName: String, fromZone: String, toZone: String, distance: Double, taxiId: String) =>
+        TaxiRide(clientId, clientName, fromZone, toZone, distance, taxiId)
     }
       .selectKey((k, ride) => ride.clientId)
       .through(Config.topics.storyShuffleKeyByClient)
@@ -130,6 +145,11 @@ object TaxiRidesScenario {
     taxiRideLogs
       .join(clientsPopulation.members, (ride: TaxiRide, client: Client) => client.copy(currentLocation = ride.toZone))
       .to(Config.topics.clientPopulation)
+
+    // update the taxis' changelog by setting their new current location to their latest taxi ride destination
+    taxiRideLogs
+        .join(taxisPopulation.members, (ride: TaxiRide, taxi: Taxi) => taxi.copy(currentZone = ride.toZone))
+        .to(Config.topics.taxiPopulation)
 
     taxiRideLogs
 

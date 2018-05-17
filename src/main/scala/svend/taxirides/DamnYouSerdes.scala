@@ -57,7 +57,27 @@ object DamnYouSerdes {
         Option(input.iterator.toSeq.head)
       }
     }
+  }
 
+  implicit object Tuple4StringsAndDoubleSerdes extends ScalaSerde[(String, String, String, String, Double)] {
+
+    override def serializer() = new Serializer[(String, String, String, String, Double)] {
+      override def serialize(data: (String, String, String, String, Double)): Array[Byte] = {
+        val baos = new ByteArrayOutputStream()
+        val output = AvroOutputStream.binary[(String, String, String, String, Double)](baos)
+        output.write(data)
+        output.close()
+        baos.toByteArray
+      }
+    }
+
+    override def deserializer() = new Deserializer[(String, String, String, String, Double)] {
+      override def deserialize(data: Array[Byte]): Option[(String, String, String, String, Double)] = {
+        val in = new ByteArrayInputStream(data)
+        val input = AvroInputStream.binary[(String, String, String, String, Double)](in)
+        Option(input.iterator.toSeq.head)
+      }
+    }
   }
 
 }

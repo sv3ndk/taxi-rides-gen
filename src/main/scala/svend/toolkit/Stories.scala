@@ -87,9 +87,10 @@ object Stories {
     }
 
     /**
-      * Generates a new value for this timer
+      * Generates a new value for this timer.
+      * Minimum value is not zero to make sure a given member does not trigger too often
       * */
-    def genTimerValue: Int = random.nextInt(25)
+    def genTimerValue: Int = 5 + random.nextInt(25)
 
     // ------------------
     // unused methods
