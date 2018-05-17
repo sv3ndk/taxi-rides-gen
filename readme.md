@@ -1,27 +1,28 @@
 # Taxi rides generator
 
 ## Overview
+
 This is a toyish proof of concept of a data generator based on Kafka Streams.
 
-It consists of a taxi ride scenario (here [TaxiRides.scala](src/main/scala/svend/taxirides/TaxisRides.scala)) containing:
+It consists of a taxi-ride scenario (here: [TaxiRides.scala](src/main/scala/svend/taxirides/TaxisRides.scala)) made of:
 
 - a set of geographical zones
 - a population of Taxis, having a current position, identified with a simple zone id
 - a population of Clients, also having a current position
 - a relationship from each client to their favourite set of zones
-- a taxi ride story, in which client perform the following steps a random time interval:
+- a taxi ride story, in which clients perform the following steps at random time interval:
    - select randomly a destination zone, among their favourite zones
    - select randomly a taxi present in their current zone
    - emit a log for the generated taxi ride
    - update their position and the taxi position.
 
-There are race conditions a bit everywhere. For example nothing prevents 2 clients to pick the same taxi concurrently.
+There are several conditions. For example nothing prevents 2 clients to pick the same taxi concurrently.
 
 The implementation is based on joins between auto-updating materialized view (aka Ktables) with Kafka Streams.
 
 Performance is not too good, I guess all those serializations come with a price...
 
-Most of the concepts are inspired from [Trumania](https://github.com/RealImpactAnalytics/trumania), in a much more basic but also more scalable fashion.
+Most of the concepts are inspired from [Trumania](https://github.com/RealImpactAnalytics/trumania), in a much more basic way.
 
 ## How to Run
 
